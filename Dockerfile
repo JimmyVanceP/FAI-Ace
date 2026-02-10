@@ -1,5 +1,5 @@
 # Dockerfile
-FROM runpod/base:0.4.0-cuda12.1.0
+FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 
 # Variables de entorno
 ENV DEBIAN_FRONTEND=noninteractive
@@ -30,17 +30,17 @@ COPY handler.py /handler.py
 # Crear directorio para outputs
 RUN mkdir -p /comfyui/output
 
-# Crear script de inicio que lance ComfyUI en background y luego el handler
-RUN echo '#!/bin/bash\n\
+# Crear script de inicio (CORREGIDO)
+RUN printf '#!/bin/bash\n\
 echo "Iniciando ComfyUI v0.12.3..."\n\
 cd /comfyui && python main.py --listen 0.0.0.0 --port 8188 --preview-method auto &\n\
 echo "Esperando a que ComfyUI esté listo..."\n\
 sleep 15\n\
 echo "Iniciando RunPod handler..."\n\
-python /handler.py' > /start.sh && chmod +x /start.sh
+python /handler.py\n' > /start.sh && chmod +x /start.sh
 
 # Exponer puertos
 EXPOSE 8188
 
 # Comando de inicio
-CMD ["/start.sh"]
+CMD ["/bin/bash", "/start.sh"]
