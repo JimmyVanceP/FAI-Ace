@@ -1,5 +1,5 @@
-# Partimos de una imagen base de RunPod con Python y CUDA
-FROM runpod/base:0.4.0-cuda11.8.0
+# Dockerfile
+FROM runpod/base:0.4.0-cuda12.1.0
 
 # Variables de entorno
 ENV DEBIAN_FRONTEND=noninteractive
@@ -13,22 +13,34 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Clonar ComfyUI versión 0.12.3
+# Clonar ComfyUI versión 0.12.3 oficial (Comfy-Org)
 WORKDIR /comfyui
 RUN git clone https://github.com/Comfy-Org/ComfyUI.git . && \
     git checkout v0.12.3
 
-# Instalar dependencias de Python
+# Instalar dependencias de Python para ComfyUI
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Instalar el handler de RunPod para serverless
-RUN pip install runpod
+# Instalar RunPod SDK
+RUN pip install --no-cache-dir runpod
 
-# Copiar el handler personalizado (necesitarás crear este archivo)
+# Copiar el handler
 COPY handler.py /handler.py
 
-# Exponer puerto
+# Crear directorio para outputs
+RUN mkdir -p /comfyui/output
+
+# Crear script de inicio que lance ComfyUI en background y luego el handler
+RUN echo '#!/bin/bash\n\
+echo "Iniciando ComfyUI v0.12.3..."\n\
+cd /comfyui && python main.py --listen 0.0.0.0 --port 8188 --preview-method auto &\n\
+echo "Esperando a que ComfyUI esté listo..."\n\
+sleep 15\n\
+echo "Iniciando RunPod handler..."\n\
+python /handler.py' > /start.sh && chmod +x /start.sh
+
+# Exponer puertos
 EXPOSE 8188
 
-# Comando para iniciar
-CMD ["python", "/handler.py"]
+# Comando de inicio
+CMD ["/start.sh"]
