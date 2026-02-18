@@ -24,9 +24,9 @@ EXPECTED_MODELS = {
 # - OUTPUT_IMAGE_QUALITY=1..100
 OUTPUT_IMAGE_FORMAT = os.environ.get("OUTPUT_IMAGE_FORMAT", "JPEG").strip().upper()
 try:
-    OUTPUT_IMAGE_QUALITY = int(os.environ.get("OUTPUT_IMAGE_QUALITY", "82"))
+    OUTPUT_IMAGE_QUALITY = int(os.environ.get("OUTPUT_IMAGE_QUALITY", "95"))
 except Exception:
-    OUTPUT_IMAGE_QUALITY = 82
+    OUTPUT_IMAGE_QUALITY = 95
 
 try:
     from PIL import Image
