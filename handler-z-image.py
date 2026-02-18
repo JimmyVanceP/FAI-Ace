@@ -1,4 +1,5 @@
 import base64
+import io
 import json
 import os
 import subprocess
@@ -16,6 +17,21 @@ EXPECTED_MODELS = {
     "clip": "qwen_3_4b.safetensors",
     "vae": "ae.safetensors",
 }
+
+# Output tuning to reduce transfer size from endpoint -> WordPress frontend.
+# You can override in RunPod env vars:
+# - OUTPUT_IMAGE_FORMAT=JPEG|WEBP
+# - OUTPUT_IMAGE_QUALITY=1..100
+OUTPUT_IMAGE_FORMAT = os.environ.get("OUTPUT_IMAGE_FORMAT", "JPEG").strip().upper()
+try:
+    OUTPUT_IMAGE_QUALITY = int(os.environ.get("OUTPUT_IMAGE_QUALITY", "82"))
+except Exception:
+    OUTPUT_IMAGE_QUALITY = 82
+
+try:
+    from PIL import Image
+except Exception:
+    Image = None
 
 
 def list_dir(path):
@@ -144,6 +160,63 @@ def download_image_from_comfyui(image_info):
     return image_bytes, content_type, None
 
 
+def compress_image_bytes(image_bytes, content_type):
+    if not image_bytes or len(image_bytes) < 1000:
+        return image_bytes, content_type, None
+
+    if Image is None:
+        return image_bytes, content_type, "Pillow not available, skipping compression"
+
+    target_quality = max(1, min(100, int(OUTPUT_IMAGE_QUALITY)))
+    target_format = OUTPUT_IMAGE_FORMAT if OUTPUT_IMAGE_FORMAT in {"JPEG", "JPG", "WEBP"} else "JPEG"
+
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as img:
+            has_alpha = "A" in img.getbands()
+            out = io.BytesIO()
+
+            if target_format in {"JPEG", "JPG"}:
+                # JPEG does not support alpha channel.
+                if has_alpha:
+                    base = Image.new("RGB", img.size, (255, 255, 255))
+                    alpha = img.split()[-1]
+                    base.paste(img, mask=alpha)
+                    img_to_save = base
+                else:
+                    img_to_save = img.convert("RGB")
+
+                img_to_save.save(
+                    out,
+                    format="JPEG",
+                    quality=target_quality,
+                    optimize=True,
+                    progressive=True,
+                )
+                new_content_type = "image/jpeg"
+            else:
+                # WEBP handles RGB/RGBA and usually compresses better.
+                img_to_save = img.convert("RGBA" if has_alpha else "RGB")
+                img_to_save.save(
+                    out,
+                    format="WEBP",
+                    quality=target_quality,
+                    method=6,
+                )
+                new_content_type = "image/webp"
+
+            compressed = out.getvalue()
+            if not compressed:
+                return image_bytes, content_type, "Compression produced empty payload"
+
+            # Keep original only if compression unexpectedly increases size too much.
+            if len(compressed) > int(len(image_bytes) * 1.10):
+                return image_bytes, content_type, "Compressed image larger than original, using original"
+
+            return compressed, new_content_type, None
+    except Exception as exc:
+        return image_bytes, content_type, f"Compression failed: {exc}"
+
+
 def handler(job):
     try:
         job_input = job.get("input", {})
@@ -205,6 +278,17 @@ def handler(job):
                         "prompt_id": prompt_id,
                         "image_info": image_info,
                     }
+
+                original_size = len(image_bytes)
+                compressed_bytes, compressed_type, compression_note = compress_image_bytes(image_bytes, content_type)
+                if compression_note:
+                    print(f"Compression note: {compression_note}")
+                image_bytes = compressed_bytes
+                content_type = compressed_type
+                print(
+                    f"Image size bytes: original={original_size}, final={len(image_bytes)}, "
+                    f"format={content_type}, quality={OUTPUT_IMAGE_QUALITY}"
+                )
 
                 image_b64 = base64.b64encode(image_bytes).decode("utf-8")
                 resolved_seed = job_input.get("seed")
