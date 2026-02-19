@@ -2,6 +2,8 @@ FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
+ENV COMFYUI_VRAM_MODE=highvram
+ENV COMFYUI_EXTRA_ARGS="--disable-async-offload --reserve-vram 1"
 
 # You can override these at build time to use your own fork:
 #   --build-arg COMFYUI_REPO=https://github.com/<you>/<your-comfyui-fork>.git
@@ -48,6 +50,8 @@ echo "STARTING RUNPOD IMAGE WORKER"\n\
 echo "========================================"\n\
 echo "COMFYUI_REPO: ${COMFYUI_REPO}"\n\
 echo "COMFYUI_REF: ${COMFYUI_REF}"\n\
+echo "COMFYUI_VRAM_MODE: ${COMFYUI_VRAM_MODE}"\n\
+echo "COMFYUI_EXTRA_ARGS: ${COMFYUI_EXTRA_ARGS}"\n\
 echo "--- Git revision ---"\n\
 cd /comfyui && git rev-parse --short HEAD\n\
 echo "--- RunPod volume check ---"\n\
@@ -62,8 +66,24 @@ else\n\
 fi\n\
 echo "--- extra_model_paths.yaml ---"\n\
 cat /comfyui/extra_model_paths.yaml\n\
+VRAM_FLAG=""\n\
+case "${COMFYUI_VRAM_MODE}" in\n\
+  highvram)\n\
+    VRAM_FLAG="--highvram"\n\
+    ;;\n\
+  normalvram)\n\
+    VRAM_FLAG="--normalvram"\n\
+    ;;\n\
+  gpu-only|gpu_only|gpuonly)\n\
+    VRAM_FLAG="--gpu-only"\n\
+    ;;\n\
+  *)\n\
+    VRAM_FLAG=""\n\
+    ;;\n\
+esac\n\
+echo "Resolved VRAM_FLAG: ${VRAM_FLAG}"\n\
 echo "Starting ComfyUI..."\n\
-cd /comfyui && python main.py --listen 0.0.0.0 --port 8188 --preview-method auto --disable-auto-launch &\n\
+cd /comfyui && python main.py --listen 0.0.0.0 --port 8188 --preview-method auto --disable-auto-launch ${VRAM_FLAG} ${COMFYUI_EXTRA_ARGS} &\n\
 echo "Waiting for ComfyUI health endpoint..."\n\
 for i in {1..90}; do\n\
   if curl -fsS http://127.0.0.1:8188/system_stats >/dev/null 2>&1; then\n\
