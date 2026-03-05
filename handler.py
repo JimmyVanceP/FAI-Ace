@@ -1,4 +1,4 @@
-# handler.py - Versión para z-image turbo con soporte de carpeta LoRA
+# handler.py - Versión SFT para acestep_v1.5_merge_sft_turbo_ta_0.5
 import runpod
 import json
 import requests
@@ -10,138 +10,13 @@ import urllib.parse
 
 COMFYUI_URL = "http://127.0.0.1:8188"
 
-# Modelos requeridos para el workflow z-image turbo
-# NOTA: Las LoRAs NO son obligatorias - se cargan dinámicamente según el workflow
+# Modelos requeridos para el workflow SFT
 REQUIRED_MODELS = {
-    "unet": "z_image_turbo_bf16.safetensors",
-    "clip": "qwen_3_4b.safetensors",
-    "vae": "ae.safetensors"
-    # Las LoRAs se detectan dinámicamente según lo que pida el workflow
+    "checkpoint": "acestep_v1.5_merge_sft_turbo_ta_0.5.safetensors",
+    "clip_1": "qwen_0.6b_ace15.safetensors",
+    "clip_2": "qwen_4b_ace15.safetensors",
+    "vae": "ace_1.5_vae.safetensors"
 }
-
-LORA_SEARCH_DIRS = [
-    "/runpod-volume/models/loras",
-    "/runpod-volume/models/lora",
-    "/workspace/models/loras",
-    "/workspace/models/lora",
-    "/comfyui/models/loras",
-    "/comfyui/models/lora",
-]
-
-
-def _list_dir_entries(path):
-    try:
-        return sorted(os.listdir(path))
-    except Exception as e:
-        print(f"Error listando {path}: {str(e)}")
-        return []
-
-
-def _extract_requested_loras(workflow):
-    """Extrae nombres de LoRA solicitadas en un workflow ComfyUI."""
-    requested = []
-    if not isinstance(workflow, dict):
-        return requested
-
-    for node in workflow.values():
-        if not isinstance(node, dict):
-            continue
-
-        inputs = node.get("inputs", {})
-        if not isinstance(inputs, dict):
-            continue
-
-        lora_name = inputs.get("lora_name")
-        if isinstance(lora_name, str) and lora_name.strip():
-            requested.append(lora_name.strip())
-
-        # Compatibilidad con nodos tipo Power Lora Loader (rgthree)
-        for key in inputs.keys():
-            if not key.startswith("lora_"):
-                continue
-            lora_slot = inputs.get(key)
-            if isinstance(lora_slot, dict):
-                lora_file = lora_slot.get("lora")
-                if isinstance(lora_file, str) and lora_file.strip():
-                    requested.append(lora_file.strip())
-
-    # Mantener orden y quitar duplicados
-    unique = []
-    seen = set()
-    for item in requested:
-        if item not in seen:
-            unique.append(item)
-            seen.add(item)
-    return unique
-
-
-def _find_lora_on_disk(lora_name):
-    matches = []
-    for lora_dir in LORA_SEARCH_DIRS:
-        candidate = os.path.join(lora_dir, lora_name)
-        if os.path.isfile(candidate):
-            matches.append(candidate)
-    return matches
-
-
-def log_lora_startup_diagnostics():
-    """Muestra un diagnostico explicito de carpetas LoRA al iniciar."""
-    print("\n" + "=" * 60)
-    print("DIAGNOSTICO DE LORAS (ARRANQUE)")
-    print("=" * 60)
-
-    found_any_dir = False
-    for lora_dir in LORA_SEARCH_DIRS:
-        exists = os.path.isdir(lora_dir)
-        print(f"{lora_dir}: {'EXISTE' if exists else 'NO EXISTE'}")
-        if not exists:
-            continue
-
-        found_any_dir = True
-        entries = _list_dir_entries(lora_dir)
-        model_files = [
-            name for name in entries
-            if name.lower().endswith(".safetensors") or name.lower().endswith(".ckpt")
-        ]
-
-        if not entries:
-            print("  - carpeta vacia")
-            continue
-
-        if model_files:
-            print(f"  - modelos LoRA detectados ({len(model_files)}):")
-            for file_name in model_files:
-                file_path = os.path.join(lora_dir, file_name)
-                try:
-                    size_mb = os.path.getsize(file_path) / (1024 * 1024)
-                    print(f"    * {file_name} ({size_mb:.2f} MB)")
-                except Exception:
-                    print(f"    * {file_name}")
-        else:
-            print("  - hay archivos, pero no .safetensors/.ckpt")
-
-    if not found_any_dir:
-        print("WARNING: No se encontro ninguna carpeta LoRA (loras/lora) en rutas esperadas.")
-
-    print("=" * 60)
-
-
-def log_requested_loras_status(workflow):
-    """Log por request: que LoRAs pide el workflow y si existen en disco."""
-    requested_loras = _extract_requested_loras(workflow)
-    if not requested_loras:
-        print("Workflow sin nodos LoRA detectables (LoraLoader/Power Lora Loader).")
-        return
-
-    print(f"LoRAs solicitadas por workflow: {requested_loras}")
-    for lora_name in requested_loras:
-        matches = _find_lora_on_disk(lora_name)
-        if matches:
-            print(f"LoRA OK: '{lora_name}' encontrada en:")
-            for match in matches:
-                print(f"  - {match}")
-        else:
-            print(f"WARNING: LoRA NO encontrada en disco: '{lora_name}'")
 
 
 def log_system_info():
@@ -161,23 +36,20 @@ def log_system_info():
             result = subprocess.run(["ls", "-la", "/runpod-volume/models"], capture_output=True, text=True)
             print(result.stdout)
 
-            # Verificar todas las carpetas de modelos incluyendo loras/lora
-            for subdir in ["checkpoints", "unet", "vae", "clip", "loras", "lora"]:
+            for subdir in ["checkpoints", "unet", "vae", "clip", "loras"]:
                 path = f"/runpod-volume/models/{subdir}"
                 if os.path.exists(path):
                     result = subprocess.run(["ls", "-la", path], capture_output=True, text=True)
                     print(f"\n{path}:\n{result.stdout}")
-                else:
-                    print(f"\n{path}: (carpeta vacía o no existe)")
     else:
         print("/runpod-volume NO EXISTE")
 
     print("\n--- Verificando /workspace (Pods) ---")
     if os.path.exists("/workspace"):
         print("/workspace EXISTE")
-        if os.path.exists("/workspace/models/unet"):
-            result = subprocess.run(["ls", "-la", "/workspace/models/unet"], capture_output=True, text=True)
-            print(f"unet: {result.stdout}")
+        if os.path.exists("/workspace/models/checkpoints"):
+            result = subprocess.run(["ls", "-la", "/workspace/models/checkpoints"], capture_output=True, text=True)
+            print(f"checkpoints: {result.stdout}")
 
     print("\n--- Verificando extra_model_paths.yaml ---")
     config_path = "/comfyui/extra_model_paths.yaml"
@@ -192,29 +64,30 @@ def log_system_info():
 
 
 def check_models():
-    """Verifica que los modelos base z-image estén disponibles"""
+    """Verifica que todos los modelos SFT estén disponibles"""
     base_paths = ["/runpod-volume/models", "/workspace/models", "/comfyui/models"]
     
     found_models = {}
     missing_models = []
     
-    # Buscar UNET
+    # Buscar checkpoint
     for base in base_paths:
-        unet_path = f"{base}/unet/{REQUIRED_MODELS['unet']}"
-        if os.path.exists(unet_path):
-            found_models['unet'] = unet_path
+        ckpt_path = f"{base}/checkpoints/{REQUIRED_MODELS['checkpoint']}"
+        if os.path.exists(ckpt_path):
+            found_models['checkpoint'] = ckpt_path
             break
     else:
-        missing_models.append(f"unet/{REQUIRED_MODELS['unet']}")
+        missing_models.append(f"checkpoints/{REQUIRED_MODELS['checkpoint']}")
     
-    # Buscar CLIP
-    for base in base_paths:
-        clip_path = f"{base}/clip/{REQUIRED_MODELS['clip']}"
-        if os.path.exists(clip_path):
-            found_models['clip'] = clip_path
-            break
-    else:
-        missing_models.append(f"clip/{REQUIRED_MODELS['clip']}")
+    # Buscar CLIP models
+    for clip_key in ["clip_1", "clip_2"]:
+        for base in base_paths:
+            clip_path = f"{base}/clip/{REQUIRED_MODELS[clip_key]}"
+            if os.path.exists(clip_path):
+                found_models[clip_key] = clip_path
+                break
+        else:
+            missing_models.append(f"clip/{REQUIRED_MODELS[clip_key]}")
     
     # Buscar VAE
     for base in base_paths:
@@ -224,29 +97,6 @@ def check_models():
             break
     else:
         missing_models.append(f"vae/{REQUIRED_MODELS['vae']}")
-    
-    # Buscar LoRAs disponibles (solo para logging informativo)
-    loras_found = []
-    for lora_path in LORA_SEARCH_DIRS:
-        if os.path.exists(lora_path):
-            try:
-                loras = [
-                    f for f in os.listdir(lora_path)
-                    if f.endswith(".safetensors") or f.endswith(".ckpt")
-                ]
-                if loras:
-                    loras_found.extend([f"{lora_path}/{l}" for l in loras])
-            except Exception as e:
-                print(f"Error leyendo carpeta LoRA {lora_path}: {str(e)}")
-
-    # Quitar duplicados preservando orden
-    loras_found = list(dict.fromkeys(loras_found))
-    
-    if loras_found:
-        found_models['loras_disponibles'] = loras_found
-        print(f"LoRAs disponibles: {loras_found}")
-    else:
-        print("No se encontraron LoRAs (carpeta vacía o no configurada)")
     
     return found_models, missing_models
 
@@ -264,12 +114,10 @@ def wait_for_comfyui():
                 if missing:
                     print(f"WARNING: Modelos faltantes: {missing}")
                 else:
-                    print(f"Todos los modelos base encontrados:")
+                    print(f"Todos los modelos SFT encontrados:")
                     for k, v in found.items():
-                        if k != 'loras_disponibles':
-                            print(f"  - {k}: {v}")
-
-                log_lora_startup_diagnostics()
+                        print(f"  - {k}: {v}")
+                
                 log_system_info()
                 return True
         except:
@@ -278,69 +126,72 @@ def wait_for_comfyui():
     return False
 
 
-def download_image_from_comfyui(image_info):
+def download_audio_from_comfyui(audio_info):
     """
-    Descarga la imagen desde el servidor local de ComfyUI
-    y la devuelve como bytes + metadata.
+    Descarga el archivo de audio desde el servidor local de ComfyUI
+    y lo devuelve como bytes + metadata.
     """
-    filename = image_info.get("filename", "")
-    subfolder = image_info.get("subfolder", "")
-    file_type = image_info.get("type", "output")
+    filename = audio_info.get("filename", "")
+    subfolder = audio_info.get("subfolder", "")
+    file_type = audio_info.get("type", "output")
 
     if not filename:
-        return None, "No filename in image_info"
+        return None, "No filename in audio_info"
 
+    # Construir la URL del endpoint /view de ComfyUI
     params = {"filename": filename, "type": file_type}
     if subfolder:
         params["subfolder"] = subfolder
 
     view_url = f"{COMFYUI_URL}/view?{urllib.parse.urlencode(params)}"
-    print(f"Descargando imagen desde ComfyUI: {view_url}")
+    print(f"Descargando audio desde ComfyUI: {view_url}")
 
     try:
-        image_response = requests.get(view_url, timeout=120)
+        audio_response = requests.get(view_url, timeout=120)
 
-        if image_response.status_code != 200:
-            return None, f"ComfyUI /view devolvió HTTP {image_response.status_code}"
+        if audio_response.status_code != 200:
+            return None, f"ComfyUI /view devolvió HTTP {audio_response.status_code}"
 
-        image_bytes = image_response.content
-        file_size = len(image_bytes)
-        print(f"Imagen descargada: {file_size} bytes ({file_size / 1024:.2f} KB)")
+        audio_bytes = audio_response.content
+        file_size = len(audio_bytes)
+        print(f"Audio descargado: {file_size} bytes ({file_size / 1024 / 1024:.2f} MB)")
 
+        # Verificar que no está vacío
         if file_size < 1000:
-            return None, f"Archivo de imagen sospechosamente pequeño: {file_size} bytes"
+            return None, f"Archivo de audio sospechosamente pequeño: {file_size} bytes"
 
-        return image_bytes, None
+        return audio_bytes, None
 
     except requests.exceptions.Timeout:
-        return None, "Timeout descargando imagen de ComfyUI"
+        return None, "Timeout descargando audio de ComfyUI"
     except Exception as e:
-        return None, f"Error descargando imagen: {str(e)}"
+        return None, f"Error descargando audio: {str(e)}"
 
 
-def find_save_image_node(outputs):
+def find_save_audio_node(outputs):
     """
-    Encuentra el nodo SaveImage en los outputs.
-    Busca en múltiples nodos posibles.
+    Encuentra el nodo SaveAudioMP3 en los outputs.
+    Busca en múltiples nodos posibles (8, 9, o cualquier otro).
     """
+    # Posibles nodos donde puede estar el SaveAudioMP3
     possible_nodes = ["9", "8", "10", "11", "12"]
     
     for node_id in possible_nodes:
         if node_id in outputs:
             node_output = outputs[node_id]
-            if isinstance(node_output, dict) and "images" in node_output:
-                image_list = node_output["images"]
-                if image_list and len(image_list) > 0:
-                    print(f"Imagen encontrada en nodo {node_id}")
-                    return image_list[0]
+            if isinstance(node_output, dict) and "audio" in node_output:
+                audio_list = node_output["audio"]
+                if audio_list and len(audio_list) > 0:
+                    print(f"Audio encontrado en nodo {node_id}")
+                    return audio_list[0]
     
     # Si no encontramos en los nodos conocidos, buscar en todos
     for node_id, node_output in outputs.items():
-        if isinstance(node_output, dict) and "images" in node_output:
-            image_list = node_output["images"]
-            if image_list and len(image_list) > 0:
-                print(f"Imagen encontrada en nodo {node_id} (búsqueda general)")
-                return image_list[0]
+        if isinstance(node_output, dict) and "audio" in node_output:
+            audio_list = node_output["audio"]
+            if audio_list and len(audio_list) > 0:
+                print(f"Audio encontrado en nodo {node_id} (búsqueda general)")
+                return audio_list[0]
     
     return None
 
@@ -352,21 +203,17 @@ def handler(job):
         return {"error": "Missing workflow"}
 
     workflow = job_input["workflow"]
-
-    # Log explicito de LoRA pedidas por el workflow y estado en disco
-    log_requested_loras_status(workflow)
-
-    # Verificar modelos base (UNET, CLIP, VAE)
+    
+    # Verificar que todos los modelos SFT estén disponibles
     found_models, missing_models = check_models()
     
     if missing_models:
-        error_msg = f"Modelos base no encontrados: {missing_models}"
+        error_msg = f"Modelos SFT no encontrados: {missing_models}"
         print(f"ERROR: {error_msg}")
         log_system_info()
         return {"error": error_msg}
     
-    print(f"Modelos base verificados: {list(found_models.keys())}")
-    print("Procesando workflow... (las LoRAs se cargarán según el workflow)")
+    print(f"Modelos SFT verificados: {list(found_models.keys())}")
 
     try:
         # Enviar workflow a ComfyUI
@@ -418,39 +265,39 @@ def handler(job):
                     outputs = job_data.get("outputs", {})
                     print(f"Outputs recibidos de ComfyUI: {json.dumps(outputs, default=str)[:500]}")
 
-                    # Buscar imagen en cualquier nodo SaveImage
-                    image_info = find_save_image_node(outputs)
+                    # Buscar audio en cualquier nodo SaveAudioMP3
+                    audio_info = find_save_audio_node(outputs)
                     
-                    if image_info:
-                        filename = image_info.get("filename", "")
-                        print(f"Imagen encontrada: {json.dumps(image_info)}")
+                    if audio_info:
+                        filename = audio_info.get("filename", "")
+                        print(f"Audio encontrado: {json.dumps(audio_info)}")
 
                         # Descargar el archivo localmente
-                        image_bytes, error = download_image_from_comfyui(image_info)
+                        audio_bytes, error = download_audio_from_comfyui(audio_info)
 
                         if error:
                             return {
-                                "error": f"Error descargando imagen: {error}",
-                                "image_info": image_info
+                                "error": f"Error descargando audio: {error}",
+                                "audio_info": audio_info
                             }
 
                         # Codificar en base64 para enviar en la respuesta
-                        image_b64 = base64.b64encode(image_bytes).decode('utf-8')
-                        print(f"Imagen codificada en base64: {len(image_b64)} caracteres")
+                        audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
+                        print(f"Audio codificado en base64: {len(audio_b64)} caracteres")
 
                         return {
                             "status": "success",
-                            "image_base64": image_b64,
+                            "audio_base64": audio_b64,
                             "filename": filename,
-                            "content_type": "image/png",
-                            "file_size": len(image_bytes),
+                            "content_type": "audio/mpeg",
+                            "file_size": len(audio_bytes),
                             "prompt_id": prompt_id
                         }
 
-                    # Si llegamos aquí, no encontramos imagen
+                    # Si llegamos aquí, no encontramos audio
                     if outputs:
                         return {
-                            "error": "No se encontró imagen en ningún nodo SaveImage",
+                            "error": "No se encontró audio en ningún nodo SaveAudioMP3",
                             "available_outputs": list(outputs.keys()),
                             "outputs_preview": {k: str(v)[:200] for k, v in outputs.items()}
                         }
@@ -463,7 +310,7 @@ def handler(job):
         return {"error": str(e)}
 
 
-print("Iniciando worker z-image turbo...")
+print("Iniciando worker ACE-STEP SFT...")
 if not wait_for_comfyui():
     print("WARNING: ComfyUI no respondió a tiempo")
 
