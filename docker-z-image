@@ -26,7 +26,7 @@ RUN git clone "${COMFYUI_REPO}" . && \
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir runpod requests pillow
 
-# Make ComfyUI load models from RunPod network volume.
+# Make ComfyUI load models from RunPod network volume with loras.
 RUN echo "comfyui:" > /comfyui/extra_model_paths.yaml && \
     echo "  base_path: /runpod-volume" >> /comfyui/extra_model_paths.yaml && \
     echo "  checkpoints: models/checkpoints/" >> /comfyui/extra_model_paths.yaml && \
