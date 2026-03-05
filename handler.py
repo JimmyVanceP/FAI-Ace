@@ -36,7 +36,7 @@ def log_system_info():
             result = subprocess.run(["ls", "-la", "/runpod-volume/models"], capture_output=True, text=True)
             print(result.stdout)
 
-            for subdir in ["checkpoints", "unet", "vae", "clip", "loras"]:
+            for subdir in ["checkpoints", "unet", "vae", "clip"]:
                 path = f"/runpod-volume/models/{subdir}"
                 if os.path.exists(path):
                     result = subprocess.run(["ls", "-la", path], capture_output=True, text=True)
