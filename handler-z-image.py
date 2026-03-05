@@ -149,6 +149,7 @@ def log_startup_diagnostics():
     print(list_dir("/runpod-volume/models/unet"))
     print(list_dir("/runpod-volume/models/clip"))
     print(list_dir("/runpod-volume/models/vae"))
+    print(list_dir("/runpod-volume/models/loras"))
     print(list_dir("/comfyui/models/unet"))
     print(list_dir("/comfyui/models/clip"))
     print(list_dir("/comfyui/models/vae"))
