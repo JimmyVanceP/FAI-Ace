@@ -19,6 +19,130 @@ REQUIRED_MODELS = {
     # Las LoRAs se detectan dinámicamente según lo que pida el workflow
 }
 
+LORA_SEARCH_DIRS = [
+    "/runpod-volume/models/loras",
+    "/runpod-volume/models/lora",
+    "/workspace/models/loras",
+    "/workspace/models/lora",
+    "/comfyui/models/loras",
+    "/comfyui/models/lora",
+]
+
+
+def _list_dir_entries(path):
+    try:
+        return sorted(os.listdir(path))
+    except Exception as e:
+        print(f"Error listando {path}: {str(e)}")
+        return []
+
+
+def _extract_requested_loras(workflow):
+    """Extrae nombres de LoRA solicitadas en un workflow ComfyUI."""
+    requested = []
+    if not isinstance(workflow, dict):
+        return requested
+
+    for node in workflow.values():
+        if not isinstance(node, dict):
+            continue
+
+        inputs = node.get("inputs", {})
+        if not isinstance(inputs, dict):
+            continue
+
+        lora_name = inputs.get("lora_name")
+        if isinstance(lora_name, str) and lora_name.strip():
+            requested.append(lora_name.strip())
+
+        # Compatibilidad con nodos tipo Power Lora Loader (rgthree)
+        for key in inputs.keys():
+            if not key.startswith("lora_"):
+                continue
+            lora_slot = inputs.get(key)
+            if isinstance(lora_slot, dict):
+                lora_file = lora_slot.get("lora")
+                if isinstance(lora_file, str) and lora_file.strip():
+                    requested.append(lora_file.strip())
+
+    # Mantener orden y quitar duplicados
+    unique = []
+    seen = set()
+    for item in requested:
+        if item not in seen:
+            unique.append(item)
+            seen.add(item)
+    return unique
+
+
+def _find_lora_on_disk(lora_name):
+    matches = []
+    for lora_dir in LORA_SEARCH_DIRS:
+        candidate = os.path.join(lora_dir, lora_name)
+        if os.path.isfile(candidate):
+            matches.append(candidate)
+    return matches
+
+
+def log_lora_startup_diagnostics():
+    """Muestra un diagnostico explicito de carpetas LoRA al iniciar."""
+    print("\n" + "=" * 60)
+    print("DIAGNOSTICO DE LORAS (ARRANQUE)")
+    print("=" * 60)
+
+    found_any_dir = False
+    for lora_dir in LORA_SEARCH_DIRS:
+        exists = os.path.isdir(lora_dir)
+        print(f"{lora_dir}: {'EXISTE' if exists else 'NO EXISTE'}")
+        if not exists:
+            continue
+
+        found_any_dir = True
+        entries = _list_dir_entries(lora_dir)
+        model_files = [
+            name for name in entries
+            if name.lower().endswith(".safetensors") or name.lower().endswith(".ckpt")
+        ]
+
+        if not entries:
+            print("  - carpeta vacia")
+            continue
+
+        if model_files:
+            print(f"  - modelos LoRA detectados ({len(model_files)}):")
+            for file_name in model_files:
+                file_path = os.path.join(lora_dir, file_name)
+                try:
+                    size_mb = os.path.getsize(file_path) / (1024 * 1024)
+                    print(f"    * {file_name} ({size_mb:.2f} MB)")
+                except Exception:
+                    print(f"    * {file_name}")
+        else:
+            print("  - hay archivos, pero no .safetensors/.ckpt")
+
+    if not found_any_dir:
+        print("WARNING: No se encontro ninguna carpeta LoRA (loras/lora) en rutas esperadas.")
+
+    print("=" * 60)
+
+
+def log_requested_loras_status(workflow):
+    """Log por request: que LoRAs pide el workflow y si existen en disco."""
+    requested_loras = _extract_requested_loras(workflow)
+    if not requested_loras:
+        print("Workflow sin nodos LoRA detectables (LoraLoader/Power Lora Loader).")
+        return
+
+    print(f"LoRAs solicitadas por workflow: {requested_loras}")
+    for lora_name in requested_loras:
+        matches = _find_lora_on_disk(lora_name)
+        if matches:
+            print(f"LoRA OK: '{lora_name}' encontrada en:")
+            for match in matches:
+                print(f"  - {match}")
+        else:
+            print(f"WARNING: LoRA NO encontrada en disco: '{lora_name}'")
+
 
 def log_system_info():
     """Loggear información completa del sistema"""
@@ -37,8 +161,8 @@ def log_system_info():
             result = subprocess.run(["ls", "-la", "/runpod-volume/models"], capture_output=True, text=True)
             print(result.stdout)
 
-            # Verificar todas las carpetas de modelos incluyendo loras
-            for subdir in ["checkpoints", "unet", "vae", "clip", "loras"]:
+            # Verificar todas las carpetas de modelos incluyendo loras/lora
+            for subdir in ["checkpoints", "unet", "vae", "clip", "loras", "lora"]:
                 path = f"/runpod-volume/models/{subdir}"
                 if os.path.exists(path):
                     result = subprocess.run(["ls", "-la", path], capture_output=True, text=True)
@@ -103,15 +227,20 @@ def check_models():
     
     # Buscar LoRAs disponibles (solo para logging informativo)
     loras_found = []
-    for base in base_paths:
-        lora_path = f"{base}/loras"
+    for lora_path in LORA_SEARCH_DIRS:
         if os.path.exists(lora_path):
             try:
-                loras = [f for f in os.listdir(lora_path) if f.endswith('.safetensors') or f.endswith('.ckpt')]
+                loras = [
+                    f for f in os.listdir(lora_path)
+                    if f.endswith(".safetensors") or f.endswith(".ckpt")
+                ]
                 if loras:
-                    loras_found.extend([f"{base}/loras/{l}" for l in loras])
-            except:
-                pass
+                    loras_found.extend([f"{lora_path}/{l}" for l in loras])
+            except Exception as e:
+                print(f"Error leyendo carpeta LoRA {lora_path}: {str(e)}")
+
+    # Quitar duplicados preservando orden
+    loras_found = list(dict.fromkeys(loras_found))
     
     if loras_found:
         found_models['loras_disponibles'] = loras_found
@@ -139,7 +268,8 @@ def wait_for_comfyui():
                     for k, v in found.items():
                         if k != 'loras_disponibles':
                             print(f"  - {k}: {v}")
-                
+
+                log_lora_startup_diagnostics()
                 log_system_info()
                 return True
         except:
@@ -222,7 +352,10 @@ def handler(job):
         return {"error": "Missing workflow"}
 
     workflow = job_input["workflow"]
-    
+
+    # Log explicito de LoRA pedidas por el workflow y estado en disco
+    log_requested_loras_status(workflow)
+
     # Verificar modelos base (UNET, CLIP, VAE)
     found_models, missing_models = check_models()
     
