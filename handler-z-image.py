@@ -301,6 +301,18 @@ def handler(job):
         workflow = job_input.get("workflow")
         if not workflow:
             return {"error": "Missing workflow in job.input"}
+        
+        # DEBUG: Verificar si el workflow contiene nodos LoRA
+        if workflow and isinstance(workflow, dict):
+            lora_nodes = {k: v for k, v in workflow.items() if isinstance(v, dict) and v.get("class_type") == "LoraLoader"}
+            if lora_nodes:
+                print(f"[DEBUG] LoRA nodes encontrados: {list(lora_nodes.keys())}")
+                for node_id, node_data in lora_nodes.items():
+                    lora_name = node_data.get("inputs", {}).get("lora_name", "UNKNOWN")
+                    print(f"[DEBUG] Nodo {node_id}: {lora_name}")
+            else:
+                print("[DEBUG] No se encontraron nodos LoraLoader en el workflow")
+                print(f"[DEBUG] Nodos en workflow: {[k for k in workflow.keys()]}")
 
         preferred_nodes = job_input.get("output_node_ids", ["9"])
         max_wait = int(job_input.get("max_wait", 300))
