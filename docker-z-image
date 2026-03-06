@@ -65,7 +65,9 @@ cd /comfyui && python main.py \\\n\
   --cache-lru 20 \\\n\
   --highvram \\\n\
   --fast \\\n\
-  --async-offload &\n\
+  --async-offload \\\n\
+  --disable-smart-memory \\\n\
+  --reserve-vram 2 &\n\
 echo "Waiting for ComfyUI health endpoint..."\n\
 for i in {1..90}; do\n\
   if curl -fsS http://127.0.0.1:8188/system_stats >/dev/null 2>&1; then\n\
