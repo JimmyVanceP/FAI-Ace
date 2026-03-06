@@ -63,6 +63,9 @@ cd /comfyui && python main.py \\\n\
   --preview-method none \\\n\
   --disable-auto-launch \\\n\
   --cache-lru 20 \\\n\
+  --highvram \\\n\
+  --fast \\\n\
+  --async-offload \\\n\
   --cpu-vae &\n\
 echo "Waiting for ComfyUI health endpoint..."\n\
 for i in {1..90}; do\n\
