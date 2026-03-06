@@ -23,9 +23,12 @@ WORKDIR /comfyui
 RUN git clone "${COMFYUI_REPO}" . && \
     git checkout "${COMFYUI_REF}"
 
-RUN pip install --no-cache-dir --upgrade --force-reinstall torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124 && \
-    pip install --no-cache-dir -r requirements.txt && \
+RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir runpod requests pillow
+
+# Install ComfyUI-GGUF custom node for CLIPLoaderGGUF / UnetLoaderGGUF support.
+RUN git clone https://github.com/city96/ComfyUI-GGUF.git /comfyui/custom_nodes/ComfyUI-GGUF && \
+    pip install --no-cache-dir -r /comfyui/custom_nodes/ComfyUI-GGUF/requirements.txt
 
 # Make ComfyUI load models from RunPod network volume with loras.
 RUN echo "comfyui:" > /comfyui/extra_model_paths.yaml && \
