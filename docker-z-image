@@ -63,7 +63,7 @@ cd /comfyui && python main.py \\\n\
   --preview-method none \\\n\
   --disable-auto-launch \\\n\
   --cache-lru 20 \\\n\
-  --gpu-only &\n\
+  --cpu-vae &\n\
 echo "Waiting for ComfyUI health endpoint..."\n\
 for i in {1..90}; do\n\
   if curl -fsS http://127.0.0.1:8188/system_stats >/dev/null 2>&1; then\n\
