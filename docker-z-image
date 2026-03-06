@@ -3,9 +3,6 @@ FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
-# You can override these at build time to use your own fork:
-#   --build-arg COMFYUI_REPO=https://github.com/<you>/<your-comfyui-fork>.git
-#   --build-arg COMFYUI_REF=main
 ARG COMFYUI_REPO=https://github.com/Comfy-Org/ComfyUI.git
 ARG COMFYUI_REF=master
 
@@ -19,7 +16,6 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /comfyui
 
-# Clone latest ComfyUI (or your fork/ref).
 RUN git clone "${COMFYUI_REPO}" . && \
     git checkout "${COMFYUI_REF}"
 
@@ -35,10 +31,8 @@ RUN echo "comfyui:" > /comfyui/extra_model_paths.yaml && \
     echo "  unet: models/unet/" >> /comfyui/extra_model_paths.yaml && \
     echo "  loras: models/loras/" >> /comfyui/extra_model_paths.yaml
 
-# Keep compatibility path used by some workflows/scripts.
 RUN mkdir -p /workspace && ln -s /comfyui/models /workspace/models 2>/dev/null || true
 
-# Handler entrypoint for RunPod serverless.
 COPY ["handler-z-image.py", "/handler.py"]
 
 RUN printf '#!/bin/bash\n\
@@ -63,7 +57,13 @@ fi\n\
 echo "--- extra_model_paths.yaml ---"\n\
 cat /comfyui/extra_model_paths.yaml\n\
 echo "Starting ComfyUI..."\n\
-cd /comfyui && python main.py --listen 0.0.0.0 --port 8188 --preview-method auto --disable-auto-launch &\n\
+cd /comfyui && python main.py \\\n\
+  --listen 0.0.0.0 \\\n\
+  --port 8188 \\\n\
+  --preview-method none \\\n\
+  --disable-auto-launch \\\n\
+  --cache-lru 20 \\\n\
+  --gpu-only &\n\
 echo "Waiting for ComfyUI health endpoint..."\n\
 for i in {1..90}; do\n\
   if curl -fsS http://127.0.0.1:8188/system_stats >/dev/null 2>&1; then\n\
@@ -77,4 +77,3 @@ python /handler.py\n' > /start.sh && chmod +x /start.sh
 
 EXPOSE 8188
 CMD ["/bin/bash", "/start.sh"]
-
