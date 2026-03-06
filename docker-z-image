@@ -1,4 +1,4 @@
-FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
+FROM runpod/pytorch:2.8.0-py3.11-cuda12.8.1-cudnn-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
@@ -63,7 +63,7 @@ fi\n\
 echo "--- extra_model_paths.yaml ---"\n\
 cat /comfyui/extra_model_paths.yaml\n\
 echo "Starting ComfyUI..."\n\
-cd /comfyui && python main.py --listen 0.0.0.0 --port 8188 --preview-method none --disable-auto-launch --cache-lru 20 &\n\
+cd /comfyui && python main.py --listen 0.0.0.0 --port 8188 --preview-method none --disable-auto-launch --highvram --cache-lru 20 &\n\
 echo "Waiting for ComfyUI health endpoint..."\n\
 for i in {1..90}; do\n\
   if curl -fsS http://127.0.0.1:8188/system_stats >/dev/null 2>&1; then\n\
