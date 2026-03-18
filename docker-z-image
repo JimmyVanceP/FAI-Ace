@@ -67,7 +67,7 @@ fi\n\
 echo "--- extra_model_paths.yaml ---"\n\
 cat /comfyui/extra_model_paths.yaml\n\
 echo "Starting ComfyUI..."\n\
-cd /comfyui && python main.py --listen 0.0.0.0 --port 8188 --preview-method auto --disable-auto-launch --cache-ram --use-sage-attention --reserve-vram 2 &\n\
+cd /comfyui && python main.py --listen 0.0.0.0 --port 8188 --preview-method auto --disable-auto-launch --cache-ram --use-sage-attention &\n\
 echo "Waiting for ComfyUI health endpoint..."\n\
 for i in {1..90}; do\n\
   if curl -fsS http://127.0.0.1:8188/system_stats >/dev/null 2>&1; then\n\
