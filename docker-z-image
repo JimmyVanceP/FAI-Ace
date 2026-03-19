@@ -2,6 +2,7 @@ FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
+ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # You can override these at build time to use your own fork:
 #   --build-arg COMFYUI_REPO=https://github.com/<you>/<your-comfyui-fork>.git
@@ -67,7 +68,7 @@ fi\n\
 echo "--- extra_model_paths.yaml ---"\n\
 cat /comfyui/extra_model_paths.yaml\n\
 echo "Starting ComfyUI..."\n\
-cd /comfyui && python main.py --listen 0.0.0.0 --port 8188 --disable-auto-launch --gpu-only --use-sage-attention --cache-classic --fast --disable-assets-autoscan --reserve-vram 1 &\n\
+cd /comfyui && python main.py --listen 0.0.0.0 --port 8188 --disable-auto-launch --highvram --use-sage-attention --cache-classic --disable-assets-autoscan --reserve-vram 2 &\n\
 echo "Waiting for ComfyUI health endpoint..."\n\
 for i in {1..90}; do\n\
   if curl -fsS http://127.0.0.1:8188/system_stats >/dev/null 2>&1; then\n\
