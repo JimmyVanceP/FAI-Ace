@@ -1,4 +1,4 @@
-FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
+FROM runpod/pytorch:2.8.0-py3.11-cuda12.8-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
@@ -24,7 +24,11 @@ RUN git clone "${COMFYUI_REPO}" . && \
     git checkout "${COMFYUI_REF}"
 
 RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir runpod requests pillow sageattention
+    pip install --no-cache-dir runpod requests pillow
+
+# Install sageattention (compatible con 4090 / Ada - sm_89).
+# En 5090 (Blackwell / sm_120) no hay wheel para Linux aún, se omite en runtime.
+RUN pip install --no-cache-dir sageattention || echo "sageattention install failed, will skip at runtime"
 
 # Install ComfyUI-GGUF custom node for CLIPLoaderGGUF / UnetLoaderGGUF support.
 RUN git clone https://github.com/city96/ComfyUI-GGUF.git /comfyui/custom_nodes/ComfyUI-GGUF && \
@@ -54,6 +58,16 @@ echo "COMFYUI_REPO: ${COMFYUI_REPO}"\n\
 echo "COMFYUI_REF: ${COMFYUI_REF}"\n\
 echo "--- Git revision ---"\n\
 cd /comfyui && git rev-parse --short HEAD\n\
+echo "--- GPU detection ---"\n\
+GPU=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)\n\
+echo "GPU detected: $GPU"\n\
+if echo "$GPU" | grep -qiE "50[0-9][0-9]|Blackwell"; then\n\
+  echo "Blackwell GPU detected: disabling sageattention (no Linux wheel yet)"\n\
+  SAGE_ARG=""\n\
+else\n\
+  echo "Non-Blackwell GPU: enabling sageattention"\n\
+  SAGE_ARG="--use-sage-attention"\n\
+fi\n\
 echo "--- RunPod volume check ---"\n\
 if [ -d "/runpod-volume/models" ]; then\n\
   ls -la /runpod-volume/models || true\n\
@@ -67,7 +81,7 @@ fi\n\
 echo "--- extra_model_paths.yaml ---"\n\
 cat /comfyui/extra_model_paths.yaml\n\
 echo "Starting ComfyUI..."\n\
-cd /comfyui && python main.py --listen 0.0.0.0 --port 8188 --preview-method auto --disable-auto-launch --cache-ram --highvram --use-sage-attention &\n\
+cd /comfyui && python main.py --listen 0.0.0.0 --port 8188 --preview-method auto --disable-auto-launch --cache-ram --highvram $SAGE_ARG &\n\
 echo "Waiting for ComfyUI health endpoint..."\n\
 for i in {1..90}; do\n\
   if curl -fsS http://127.0.0.1:8188/system_stats >/dev/null 2>&1; then\n\
