@@ -37,7 +37,8 @@ RUN echo "comfyui:" > /comfyui/extra_model_paths.yaml && \
     echo "  clip: models/clip/" >> /comfyui/extra_model_paths.yaml && \
     echo "  vae: models/vae/" >> /comfyui/extra_model_paths.yaml && \
     echo "  unet: models/unet/" >> /comfyui/extra_model_paths.yaml && \
-    echo "  loras: models/loras/" >> /comfyui/extra_model_paths.yaml
+    echo "  loras: models/loras/" >> /comfyui/extra_model_paths.yaml && \
+    echo "  upscale_models: models/upscale_models/" >> /comfyui/extra_model_paths.yaml
 
 # Keep compatibility path used by some workflows/scripts.
 RUN mkdir -p /workspace && ln -s /comfyui/models /workspace/models 2>/dev/null || true
