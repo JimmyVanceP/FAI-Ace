@@ -25,7 +25,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir runpod
 
 # ============================================
-# CONFIGURACIÓN PARA NETWORK VOLUME (Serverless)
+# CONFIGURACIÓN PARA NETWORK VOLUME FINAL (Serverless)
 # ============================================
 RUN echo "comfyui:"                                    > /comfyui/extra_model_paths.yaml && \
     echo "  base_path: /runpod-volume"                >> /comfyui/extra_model_paths.yaml && \
