@@ -10,7 +10,7 @@ import urllib.parse
 
 COMFYUI_URL = "http://127.0.0.1:8188"
 
-# Modelos requeridos para el workflow SFT
+# Modelos requeridos para el workflow 1.5 XL SFT
 REQUIRED_MODELS = {
     "checkpoint": "acestep_v1.5_xl_sft_bf16.safetensors",
     "clip_1": "qwen_0.6b_ace15.safetensors",
