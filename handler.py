@@ -12,7 +12,7 @@ COMFYUI_URL = "http://127.0.0.1:8188"
 
 # Modelos requeridos para el workflow SFT
 REQUIRED_MODELS = {
-    "checkpoint": "acestep_v1.5_merge_sft_turbo_ta_0.5.safetensors",
+    "checkpoint": "acestep_v1.5_xl_sft_bf16.safetensors",
     "clip_1": "qwen_0.6b_ace15.safetensors",
     "clip_2": "qwen_4b_ace15.safetensors",
     "vae": "ace_1.5_vae.safetensors"
