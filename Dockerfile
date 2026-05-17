@@ -54,9 +54,9 @@ if [ -d "/runpod-volume/models/checkpoints" ]; then\n\
     echo "/runpod-volume/models/checkpoints no existe o está vacío"\n\
 fi\n\
 echo "--- Verificando modelo embebido ---"\n\
-if [ -f "/comfyui/models/checkpoints/ace_step_1.5_turbo_aio.safetensors" ]; then\n\
+if [ -f "/comfyui/models/checkpoints/acestep_v1.5_xl_sft_bf16.safetensors" ]; then\n\
     echo "OK: Modelo embebido encontrado"\n\
-    ls -lh /comfyui/models/checkpoints/ace_step_1.5_turbo_aio.safetensors\n\
+    ls -lh /comfyui/models/checkpoints/acestep_v1.5_xl_sft_bf16.safetensors\n\
 else\n\
     echo "ADVERTENCIA: Modelo embebido no encontrado"\n\
 fi\n\
