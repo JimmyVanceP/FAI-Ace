@@ -41,7 +41,7 @@ RUN ln -s /comfyui/models /workspace/models 2>/dev/null || true
 # Copiar el handler
 COPY handler.py /handler.py
 
-# Crear script de inicio con verificación completa
+# Crear script de inicio con verificación completa 2
 RUN printf '#!/bin/bash\n\
 echo "========================================"\n\
 echo "INICIANDO WORKER ACE-STEP 1.5 xl sft"\n\
