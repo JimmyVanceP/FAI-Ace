@@ -44,7 +44,7 @@ COPY handler.py /handler.py
 # Crear script de inicio con verificación completa
 RUN printf '#!/bin/bash\n\
 echo "========================================"\n\
-echo "INICIANDO WORKER ACE-STEP"\n\
+echo "INICIANDO WORKER ACE-STEP 1.5 xl sft"\n\
 echo "========================================"\n\
 sleep 2\n\
 echo "--- Verificando /runpod-volume ---"\n\
