@@ -27,13 +27,14 @@ RUN pip install --no-cache-dir runpod
 # ============================================
 # CONFIGURACIÓN PARA NETWORK VOLUME (Serverless)
 # ============================================
-# Crear archivo de configuración para que ComfyUI busque en /runpod-volume
-RUN echo "comfyui:" > /comfyui/extra_model_paths.yaml && \
-    echo "  base_path: /runpod-volume" >> /comfyui/extra_model_paths.yaml && \
-    echo "  checkpoints: models/checkpoints/" >> /comfyui/extra_model_paths.yaml && \
-    echo "  clip: models/clip/" >> /comfyui/extra_model_paths.yaml && \
-    echo "  vae: models/vae/" >> /comfyui/extra_model_paths.yaml && \
-    echo "  unet: models/unet/" >> /comfyui/extra_model_paths.yaml
+RUN echo "comfyui:"                                    > /comfyui/extra_model_paths.yaml && \
+    echo "  base_path: /runpod-volume"                >> /comfyui/extra_model_paths.yaml && \
+    echo "  checkpoints: models/checkpoints/"         >> /comfyui/extra_model_paths.yaml && \
+    echo "  diffusion_models: models/diffusion_models/" >> /comfyui/extra_model_paths.yaml && \
+    echo "  clip: models/clip/"                       >> /comfyui/extra_model_paths.yaml && \
+    echo "  text_encoders: models/text_encoders/"     >> /comfyui/extra_model_paths.yaml && \
+    echo "  vae: models/vae/"                         >> /comfyui/extra_model_paths.yaml && \
+    echo "  unet: models/unet/"                       >> /comfyui/extra_model_paths.yaml
 
 # Crear symlinks por si acaso (para compatibilidad)
 RUN ln -s /comfyui/models /workspace/models 2>/dev/null || true
@@ -41,29 +42,31 @@ RUN ln -s /comfyui/models /workspace/models 2>/dev/null || true
 # Copiar el handler
 COPY handler.py /handler.py
 
-# Crear script de inicio con verificación completa 2
+# Crear script de inicio con verificación completa
 RUN printf '#!/bin/bash\n\
 echo "========================================"\n\
 echo "INICIANDO WORKER ACE-STEP 1.5 xl sft"\n\
 echo "========================================"\n\
 sleep 2\n\
 echo "--- Verificando /runpod-volume ---"\n\
-if [ -d "/runpod-volume/models/checkpoints" ]; then\n\
-    echo "Contenido de /runpod-volume/models/checkpoints:"\n\
-    ls -la /runpod-volume/models/checkpoints/\nelse\n\
-    echo "/runpod-volume/models/checkpoints no existe o está vacío"\n\
-fi\n\
-echo "--- Verificando modelo embebido ---"\n\
-if [ -f "/comfyui/models/checkpoints/acestep_v1.5_xl_sft_bf16.safetensors" ]; then\n\
-    echo "OK: Modelo embebido encontrado"\n\
-    ls -lh /comfyui/models/checkpoints/acestep_v1.5_xl_sft_bf16.safetensors\n\
+if [ -d "/runpod-volume/models/diffusion_models" ]; then\n\
+    echo "Contenido de /runpod-volume/models/diffusion_models:"\n\
+    ls -la /runpod-volume/models/diffusion_models/\n\
 else\n\
-    echo "ADVERTENCIA: Modelo embebido no encontrado"\n\
+    echo "/runpod-volume/models/diffusion_models no existe o esta vacio"\n\
 fi\n\
-echo "--- Contenido extra_model_paths.yaml ---"\ncat /comfyui/extra_model_paths.yaml\n\
+if [ -d "/runpod-volume/models/text_encoders" ]; then\n\
+    echo "Contenido de /runpod-volume/models/text_encoders:"\n\
+    ls -la /runpod-volume/models/text_encoders/\n\
+else\n\
+    echo "/runpod-volume/models/text_encoders no existe o esta vacio"\n\
+fi\n\
+echo "--- Contenido extra_model_paths.yaml ---"\n\
+cat /comfyui/extra_model_paths.yaml\n\
 echo "========================================"\n\
 echo "Iniciando ComfyUI..."\n\
-cd /comfyui && python main.py --listen 0.0.0.0 --port 8188 --preview-method auto &\nsleep 15\n\
+cd /comfyui && python main.py --listen 0.0.0.0 --port 8188 --preview-method auto &\n\
+sleep 15\n\
 echo "Iniciando handler..."\n\
 python /handler.py\n' > /start.sh && chmod +x /start.sh
 
